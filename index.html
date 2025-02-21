@@ -1,9 +1,26 @@
 <!doctype html>
 <html>
-    <head>
-        <title>JS Boilerplate</title>
-    </head>
-    <body>
-        <script src="dist/bundle.js"></script>
-    </body>
+<head>
+  <title>Przykładowa Muzyka - Wizualizator</title>
+</head>
+<body style="margin: 0; background-color: black; color: white;">
+  <div id="controls" style="background-color: white; color: black;">
+
+    <audio controls controlsList="nodownload noplaybackrate" style="width: 500px;" id="audio">
+      <source src="css.mp3" type="audio/mpeg">
+      Your browser does not support the audio element.
+    </audio>
+
+
+    <label for="frequency">Time Base: <span id="timeBaseValue">6</span> ms</label>
+    <input id="frequency" type="range" min="1" max="20" step="0.2" value="10.2">
+
+    <label for="gain">Input Gain: <span id="gainValue">1</span></label>
+    <input id="gain" type="range" min="0" max="2" step="0.01" value="0.5">
+
+  </div>
+
+  <canvas id="canvas" width="1024" height="768"></canvas>
+</body>
+<script src="dist/bundle.js"></script>
 </html>

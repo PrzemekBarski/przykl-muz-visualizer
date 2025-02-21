@@ -1,234 +1,294 @@
-let pixelRatio, sizeOnScreen, segmentWidth, vp, timeBase;
+// if (navigator.mediaDevices) {
+//       navigator.mediaDevices.getUserMedia({"audio": true}).then((stream) => {
 
-// navigator.getUserMedia = navigator.getUserMedia
-//                       || navigator.webkitGetUserMedia
-//                       || navigator.mozGetUserMedia;
+//         this.microphone = this.audioContext.createMediaStreamSource(stream);
 
-const timeBaseSlider = document.getElementById("frequency"),
-  gainSlider = document.getElementById("gain"),
-  lowPassSlider = document.getElementById("lowpass"),
-  highPassSlider = document.getElementById("highpass"),
-  thresholdSlider = document.getElementById("threshold"),
-  rmsSlider = document.getElementById("rms"),
-  smoothingSlider = document.getElementById("smoothing"),
-  audioInputSelect = document.getElementById("audioSource");
+//         this.microphone.connect(this.lowPassFilter);
+//         this.microphone.connect(this.rmsAnalyser);
+//         this.lowPassFilter.connect(this.highPassFilter);
+//         this.highPassFilter.connect(this.analyser);
+//       }).catch((err) => {
+//         console.error(err, err.stack);
+//       });
+//     }
 
-timeBase = timeBaseSlider.value / 1000;
-
-const canvas = document.getElementById("canvas"),
-  c = canvas.getContext("2d");
-
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-pixelRatio = canvas.width / canvas.height;
-vp = canvas.height / 768;
-sizeOnScreen = canvas.getBoundingClientRect();
-canvas.width = sizeOnScreen.width * pixelRatio;
-canvas.height = sizeOnScreen.height * pixelRatio;
-canvas.style.width = canvas.width / pixelRatio + "px";
-canvas.style.height = canvas.height / pixelRatio + "px";
-
-c.fillStyle = "#000";
-c.fillRect(0, 0, canvas.width, canvas.height);
-
-c.shadowColor = "#33ee55";
-c.shadowBlur = 20 * vp;
-c.shadowOffsetX = 0;
-c.shadowOffsetY = 0;
-
-c.strokeStyle = "#33ee55";
-c.lineWidth = 12 * vp;
-c.beginPath();
-c.moveTo(0, canvas.height / 2);
-c.lineTo(canvas.width, canvas.height / 2);
-c.stroke();
+class Visualizer {
+  audioContext = new AudioContext();
+  smoothingIteration = 0;
+  smoothingLevel = 1;
 
 
+  constructor(canvas, rmsSlider) {
+    this.canvas = canvas;
+    this.rmsSlider = rmsSlider;
+    this.c = this.canvas.getContext("2d");
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this.vp = this.canvas.height / 768;
+    this.rmsSlider = rmsSlider;
 
-const audioContext = new AudioContext();
+    let pixelRatio = this.canvas.width / this.canvas.height;
 
-const flicker = (opacity, counter = 0) => {
+    let sizeOnScreen = this.canvas.getBoundingClientRect();
+    this.canvas.width = sizeOnScreen.width * pixelRatio;
+    this.canvas.height = sizeOnScreen.height * pixelRatio;
+    this.canvas.style.width = this.canvas.width / pixelRatio + "px";
+    this.canvas.style.height = this.canvas.height / pixelRatio + "px";
 
-  if (counter < 5) {
-    setTimeout(() => {
-      canvas.style.opacity = opacity;
-      console.log(counter);
-      flicker(opacity ? 0 : 1, counter + 1);
-    }, 50 + Math.random() * 50);
+    this.initAudioNodes();
   }
-};
 
-// GATE
-// ---------
+  start() {
+    this.initCanvas();
+    this.initRmsTracking();
+    this.routeAudio();
+    this.draw();
+  }
 
-const rmsAnalyser = audioContext.createAnalyser();
-let rmsDataArray = new Uint8Array(rmsAnalyser.frequencyBinCount);
+  setTimeBase(timeBaseMs) {
+    this.timeBase = timeBaseMs / 1000;
+  }
 
-let logoTimeout,
-  scopeTimeout,
-  scopeOn = true,
-  logoWait = false,
-  scopeWait = false,
-  threshold = thresholdSlider.value;
+  setSmoothingLevel(smoothingLevel) {
+    this.smoothingIteration = 0;
+    this.smoothingLevel = smoothingLevel;
+  }
 
-setInterval(function () {
-  // Time domain values
-  rmsAnalyser.getByteTimeDomainData(rmsDataArray);
+  setGain(gain) {
+    this.gain = gain;
+  }
 
-  // Get the RMS value as a value of intensity (envelope)
-  let rms = Math.sqrt(
-    rmsDataArray.reduce(function (acc, val) {
-      return acc + Math.pow((val - 128) / 128, 2);
-    }, 0) / rmsDataArray.length
-  );
+  setLowPassCutoff(lowPassCutoff) {
+    this.lowPassFilter.frequency.setValueAtTime(lowPassCutoff, this.audioContext.currentTime);
+  }
 
-  rmsSlider.value = rms;
+  setHighPassCutoff(highPassCutoff) {
+    this.highPassFilter.frequency.setValueAtTime(highPassCutoff, this.audioContext.currentTime);
+  }
 
-  if (rms < threshold) {
-    clearTimeout(scopeTimeout);
-    scopeWait = false;
+  setThreshld(threshold) {
+    this.threshold = threshold;
+  }
 
-    if (scopeOn && !logoWait) {
-      logoWait = true;
-      logoTimeout = setTimeout(() => {
-        console.log("off");
-        flicker(0);
-        scopeOn = false;
-        logoWait = false;
-      }, 1000);
+  initCanvas() {
+    this.c.fillStyle = "#000";
+    this.c.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    this.c.shadowColor = "#33ee55";
+    this.c.shadowBlur = 20 * this.vp;
+    this.c.shadowOffsetX = 0;
+    this.c.shadowOffsetY = 0;
+
+    this.c.strokeStyle = "#33ee55";
+    this.c.lineWidth = 12 * this.vp;
+    this.c.beginPath();
+    this.c.moveTo(0, this.canvas.height / 2);
+    this.c.lineTo(this.canvas.width, this.canvas.height / 2);
+    this.c.stroke();
+  }
+
+  flicker(opacity, counter = 0) {
+    if (counter < 5) {
+      setTimeout(() => {
+        this.canvas.style.opacity = opacity;
+        this.flicker(opacity ? 0 : 1, counter + 1);
+      }, 50 + Math.random() * 50);
     }
-  } else {
-    clearTimeout(logoTimeout);
-    logoWait = false;
+  }
 
-    if (!scopeOn && !scopeWait) {
-      scopeWait = true;
-      scopeTimeout = setTimeout(() => {
-        console.log("on");
-        flicker(1);
-        scopeOn = true;
+  initRmsTracking() {
+    this.rmsAnalyser = this.audioContext.createAnalyser();
+    let rmsDataArray = new Uint8Array(this.rmsAnalyser.frequencyBinCount);
+
+    let logoTimeout,
+      scopeTimeout,
+      scopeOn = true,
+      logoWait = false,
+      scopeWait = false;
+
+    setInterval(() => {
+      // Time domain values
+      this.rmsAnalyser.getByteTimeDomainData(rmsDataArray);
+      // Get the RMS value as a value of intensity (envelope)
+      let rms = Math.sqrt(
+        rmsDataArray.reduce(function (acc, val) {
+          return acc + Math.pow((val - 128) / 128, 2);
+        }, 0) / rmsDataArray.length
+      );
+
+      this.rmsSlider.value = rms;
+
+      if (rms < this.threshold) {
+        clearTimeout(scopeTimeout);
         scopeWait = false;
-      }, 1000);
+
+        if (scopeOn && !logoWait) {
+          logoWait = true;
+          logoTimeout = setTimeout(() => {
+            this.flicker(0);
+            scopeOn = false;
+            logoWait = false;
+          }, 500);
+        }
+      } else {
+        clearTimeout(logoTimeout);
+        logoWait = false;
+
+        if (!scopeOn && !scopeWait) {
+          scopeWait = true;
+          scopeTimeout = setTimeout(() => {
+            this.flicker(1);
+            scopeOn = true;
+            scopeWait = false;
+          }, 500);
+        }
+      }
+    }, 50);
+  }
+
+  initAudioNodes() {
+    // ANALYSER
+    // ---------
+
+    this.analyser = this.audioContext.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 1;
+
+    this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+    this.previousData = new Uint8Array(this.analyser.frequencyBinCount);
+    this.dataToDraw = new Uint8Array(this.analyser.frequencyBinCount);
+
+
+    // LOW PASS FILTER
+    // ---------
+
+    this.lowPassFilter = this.audioContext.createBiquadFilter();
+    this.lowPassFilter.type = "lowpass";
+
+
+    // HIGH PASS FILTER
+    // ---------
+
+    this.highPassFilter = this.audioContext.createBiquadFilter();
+    this.highPassFilter.type = "highpass";
+
+
+    // AUDIO PLAYER
+    // --------------
+
+    const audioElement = document.getElementById("audio");
+    audioElement.onplay = () => this.audioContext.resume();
+    this.audioPlayer = this.audioContext.createMediaElementSource(audioElement);
+
+    // MIC
+    // --------------
+
+    // if (navigator.mediaDevices) {
+    //   navigator.mediaDevices.getUserMedia({"audio": true}).then((stream) => {
+
+    //     this.microphone = this.audioContext.createMediaStreamSource(stream);
+
+    //     this.microphone.connect(this.lowPassFilter);
+    //     this.microphone.connect(this.rmsAnalyser);
+    //     this.lowPassFilter.connect(this.highPassFilter);
+    //     this.highPassFilter.connect(this.analyser);
+    //   }).catch((err) => {
+    //     console.error(err, err.stack);
+    //   });
+    // }
+  }
+
+  routeAudio() {
+    // this.audioPlayer.connect(this.audioContext.destination);
+    // this.audioPlayer.connect(this.lowPassFilter);
+    // this.audioPlayer.connect(this.rmsAnalyser);
+    // this.lowPassFilter.connect(this.highPassFilter);
+    // this.highPassFilter.connect(this.analyser);
+    if (navigator.mediaDevices) {
+      navigator.mediaDevices.getUserMedia({"audio": true}).then((stream) => {
+
+        this.microphone = this.audioContext.createMediaStreamSource(stream);
+        this.microphone.connect(this.lowPassFilter);
+        this.microphone.connect(this.rmsAnalyser);
+        this.lowPassFilter.connect(this.highPassFilter);
+        this.highPassFilter.connect(this.analyser);
+      }).catch((err) => {
+        console.error(err, err.stack);
+      });
     }
   }
-}, 50);
 
+  draw() {
+    let segmentWidth;
 
-// ANALYSER
-// ---------
+    if (this.smoothingLevel > 1) {
+      if (this.smoothingIteration == this.smoothingLevel - 1) {
+        this.previousData = [...this.dataArray];
+        this.analyser.getByteTimeDomainData(this.dataArray);
+        this.smoothingIteration = 0;
+      }
 
-const analyser = audioContext.createAnalyser();
-analyser.fftSize = 2048;
-analyser.smoothingTimeConstant = 1;
+      this.dataToDraw = this.dataArray.map((el, index) => {
+        // return (this.previousData[index] * (this.smoothingLevel - this.smoothingIteration) + el * this.smoothingIteration) / this.smoothingLevel;
+        return (this.previousData[index] * Math.pow(this.smoothingLevel - this.smoothingIteration, 2) + el * Math.pow(this.smoothingIteration, 2)) / (Math.pow(this.smoothingLevel - this.smoothingIteration, 2) + Math.pow(this.smoothingIteration, 2));
+      });
+    } else {
+      this.analyser.getByteTimeDomainData(this.dataToDraw);
+    }
 
-let dataArray = new Uint8Array(analyser.frequencyBinCount);
-let previousData = new Uint8Array(analyser.frequencyBinCount);
-let dataToDraw = new Uint8Array(analyser.frequencyBinCount);
+    let length = this.audioContext.sampleRate * this.timeBase;
+    segmentWidth = this.canvas.width / length;
+    this.c.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.c.beginPath();
 
+    this.c.moveTo(this.canvas.width * -2, this.canvas.height / 2);
 
-// LOW PASS FILTER
-// ---------
+    let x = 0;
 
-const lowPassFilter = audioContext.createBiquadFilter();
-lowPassFilter.type = "lowpass";
-lowPassFilter.frequency.setValueAtTime(lowPassSlider.value, audioContext.currentTime);
+    for (let i = 1; i < length; i += 1) {
+      x = i * segmentWidth;
+      let v = ((this.dataToDraw[i] - 128) * this.gain + 128) / 128.0;
+      let y = (v * this.canvas.height) / 2;
+      this.c.lineTo(x, y);
+    }
 
+    this.c.lineTo(this.canvas.width * 2, this.canvas.height / 2);
+    this.c.stroke();
 
-// HIGH PASS FILTER
-// ---------
-
-const highPassFilter = audioContext.createBiquadFilter();
-highPassFilter.type = "highpass";
-highPassFilter.frequency.setValueAtTime(highPassSlider.value, audioContext.currentTime);
-
-
-// AUDIO PLAYER
-// --------------
-
-// const audioElement = document.getElementById("audio");
-// audioElement.onplay = () => audioContext.resume();
-// let source = audioContext.createMediaElementSource(audioElement);
-
-// source.connect(audioContext.destination);
-
-
-// MIC
-// --------------
-
-if (navigator.mediaDevices) {
-  navigator.mediaDevices.getUserMedia({"audio": true}).then((stream) => {
-
-    const microphone = audioContext.createMediaStreamSource(stream);
-
-    microphone.connect(lowPassFilter);
-    microphone.connect(rmsAnalyser);
-    lowPassFilter.connect(highPassFilter);
-    highPassFilter.connect(analyser);
-  }).catch((err) => {
-    console.err(err);
-  });
+    this.smoothingIteration += 1;
+    requestAnimationFrame(this.draw.bind(this));
+  }
 }
 
+const visualizer = new Visualizer(document.getElementById("canvas"), document.getElementById("rms"));
 
-// DRAW SIGNAL
-// --------------
 
-let iterations = 1;
-let iteration = 0;
-let gain = 0.5;
+const timeBaseSlider = document.getElementById("frequency");
+const gainSlider = document.getElementById("gain");
+const lowPassSlider = document.getElementById("lowpass");
+const highPassSlider = document.getElementById("highpass");
+const thresholdSlider = document.getElementById("threshold");
+const smoothingSlider = document.getElementById("smoothing");
 
-const draw = () => {
-  if (iterations > 1) {
-    if (iteration == iterations - 1) {
-      previousData = [...dataArray];
-      analyser.getByteTimeDomainData(dataArray);
-      iteration = 0;
-    }
+visualizer.setLowPassCutoff(lowPassSlider.value);
+visualizer.setHighPassCutoff(highPassSlider.value);
+visualizer.setSmoothingLevel(smoothingSlider.value);
+visualizer.setTimeBase(timeBaseSlider.value);
+visualizer.setGain(gainSlider.value);
+visualizer.setThreshld(thresholdSlider.value);
 
-    dataToDraw = dataArray.map((el, index) => {
-      // return (previousData[index] * (iterations - iteration) + el * iteration) / iterations;
-      return (previousData[index] * Math.pow(iterations - iteration, 2) + el * Math.pow(iteration, 2)) / (Math.pow(iterations - iteration, 2) + Math.pow(iteration, 2));
-    });
-  } else {
-    analyser.getByteTimeDomainData(dataToDraw);
-  }
-
-  let length = audioContext.sampleRate * timeBase;
-  segmentWidth = canvas.width / length;
-  c.fillRect(0, 0, canvas.width, canvas.height);
-  c.beginPath();
-
-  c.moveTo(canvas.width * -2, canvas.height / 2);
-
-  let x = 0;
-
-  for (let i = 1; i < length; i += 1) {
-    x = i * segmentWidth;
-    let v = ((dataToDraw[i] - 128) * gain + 128) / 128.0;
-    let y = (v * canvas.height) / 2;
-    c.lineTo(x, y);
-  }
-
-  c.lineTo(canvas.width * 2, canvas.height / 2);
-  c.stroke();
-
-  iteration += 1;
-  requestAnimationFrame(draw);
-};
-
-draw();
-
+visualizer.start();
 
 timeBaseSlider.addEventListener("input", (event) => {
   document.getElementById("timeBaseValue").innerHTML = Number.parseFloat(event.target.value).toFixed(2);
 
-  timeBase = event.target.value / 1000;
+  visualizer.setTimeBase(event.target.value);
 });
 
 gainSlider.addEventListener("input", (event) => {
   document.getElementById("gainValue").innerHTML = parseInt(event.target.value * 100);
 
-  gain = event.target.value;
+  visualizer.setGain(event.target.value);
 });
 
 lowPassSlider.addEventListener("input", (event) => {
@@ -239,7 +299,7 @@ lowPassSlider.addEventListener("input", (event) => {
     document.getElementById("lowPassValue").innerHTML = event.target.value;
   }
 
-  lowPassFilter.frequency.setValueAtTime(event.target.value, audioContext.currentTime);
+  visualizer.setLowPassCutoff(event.target.value);
 });
 
 highPassSlider.addEventListener("input", (event) => {
@@ -250,22 +310,20 @@ highPassSlider.addEventListener("input", (event) => {
     document.getElementById("highPassValue").innerHTML = event.target.value;
   }
 
-  highPassFilter.frequency.setValueAtTime(event.target.value, audioContext.currentTime);
+  visualizer.setHighPassCutoff(event.target.value);
 });
 
 thresholdSlider.addEventListener("input", (event) => {
-  threshold = event.target.value;
-  console.log(threshold);
+  visualizer.setThreshld(event.target.value);
 });
 
 smoothingSlider.addEventListener("input", (event) => {
   document.getElementById("smoothingValue").innerHTML = event.target.value;
 
-  iteration = 0;
-  iterations = event.target.value;
+  visualizer.setSmoothingLevel(event.target.value);
 });
 
 
-audioInputSelect.addEventListener("onchange", (event) => {
-  console.log(event.target.value);
-});
+// audioInputSelect.addEventListener("onchange", (event) => {
+//   console.log(event.target.value);
+// });

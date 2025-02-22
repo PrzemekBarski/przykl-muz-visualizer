@@ -8,7 +8,8 @@
     "lint:watch": "esw src --watch",
     "build": "webpack --mode=production --config webpack.config.js",
     "serve": "webpack serve --mode=development --config webpack.config.js",
-    "start": "run-p lint:watch serve"
+    "start": "run-p lint:watch serve",
+    "open-server": "http-server"
   },
   "author": "Przemysław Barski",
   "license": "ISC",

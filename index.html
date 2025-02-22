@@ -11,21 +11,21 @@
 
   <div id="controls" style="background-color: white; color: black; padding: 30px 20px; display: flex; margin-top: 20px;">
 
-    <div style="padding: 0 20px;">
+    <div style="padding: 0 20px; flex-basis: 50%;">
 
       <div>
         <label for="lowpass">Low Pass: <span id="lowPassValue">20 k</span>Hz</label><br>
-        <input id="lowpass" type="range" min="50" max="20000" step="1" value="20000" style="width: 600px; margin-bottom: 20px;">
+        <input id="lowpass" type="range" min="50" max="20000" step="1" value="20000" style="width: 100%; margin-bottom: 20px;">
       </div>
 
       <div>
         <label for="timebase">Time Base: <span id="timeBaseValue">10</span> ms</label><br>
-        <input id="timebase" type="range" min="2" max="12" step="0.2" value="10" style="width: 600px; margin-bottom: 20px;">
+        <input id="timebase" type="range" min="2" max="12" step="0.2" value="10" style="width: 100%; margin-bottom: 20px;">
       </div>
 
       <div>
         <label for="gain">Input Gain: <span id="gainValue">50</span>%</label><br>
-        <input id="gain" type="range" min="0" max="2" step="0.01" value="0.5" style="width: 600px; margin-bottom: 20px;">
+        <input id="gain" type="range" min="0" max="2" step="0.01" value="0.5" style="width: 100%; margin-bottom: 20px;">
       </div>
 
       <div style="display: flex;">
@@ -45,24 +45,24 @@
 
     </div>
 
-    <div style="padding: 0 20px;">
+    <div style="padding: 0 20px; flex-basis: 50%;">
 
       <div>
         <label for="highpass">High Pass: <span id="highPassValue">10 </span>Hz</label><br>
-        <input id="highpass" type="range" min="10" max="20000" step="1" value="10" style="width: 600px; margin-bottom: 20px;">
+        <input id="highpass" type="range" min="10" max="20000" step="1" value="10" style="width: 100%; margin-bottom: 20px;">
       </div>
 
-      <audio controls controlsList="nodownload noplaybackrate" style="width: 500px; margin-bottom: 20px" id="audio">
+      <!-- <audio controls controlsList="nodownload noplaybackrate" style="width: 100%; margin-bottom: 20px" id="audio">
         <source src="css.mp3" type="audio/mpeg">
         Your browser does not support the audio element.
-      </audio>
+      </audio> -->
 
       <div>
         <label for="threshold">Threshold:<br>
-        <input id="threshold" type="range" min="0" max="1" step="0.001" value="0.03" style="width: 600px; margin-bottom: 10px;">
+        <input id="threshold" type="range" min="0" max="1" step="0.001" value="0.03" style="width: 100%; margin-bottom: 10px;">
 
         <div style="background-color: #aaa; border-radius: 20px;">
-          <input id="rms" type="range" min="0" max="1" step="0.001" value="0" style="width: 600px;">
+          <input id="rms" type="range" min="0" max="1" step="0.001" value="0" style="width: 100%;">
         </div>
       </div>
 

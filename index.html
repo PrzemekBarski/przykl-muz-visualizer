@@ -4,17 +4,23 @@
   <title>Przykładowa Muzyka - Wizualizator</title>
 </head>
 <body style="margin: 0; background-color: black; color: white;">
-  <div id="controls" style="background-color: white; color: black; padding: 30px 20px; display: flex;">
+
+  <div style="background-image: url('logo.jpg'); background-repeat: no-repeat; background-size: contain; background-position: center;">
+    <canvas id="canvas" width="1024" height="768"></canvas>
+  </div>
+
+  <div id="controls" style="background-color: white; color: black; padding: 30px 20px; display: flex; margin-top: 20px;">
 
     <div style="padding: 0 20px;">
-      <div>
-        <label for="frequency">Time Base: <span id="timeBaseValue">6</span> ms</label><br>
-        <input id="frequency" type="range" min="1" max="20" step="0.2" value="10.2" style="width: 600px; margin-bottom: 20px;">
-      </div>
 
       <div>
         <label for="lowpass">Low Pass: <span id="lowPassValue">20 k</span>Hz</label><br>
         <input id="lowpass" type="range" min="50" max="20000" step="1" value="20000" style="width: 600px; margin-bottom: 20px;">
+      </div>
+
+      <div>
+        <label for="timebase">Time Base: <span id="timeBaseValue">10</span> ms</label><br>
+        <input id="timebase" type="range" min="2" max="12" step="0.2" value="10" style="width: 600px; margin-bottom: 20px;">
       </div>
 
       <div>
@@ -28,13 +34,13 @@
           <input id="smoothing" type="range" min="1" max="6" step="1" value="1" style="width: 200px;">
         </div>
 
-        <div>
+        <!-- <div>
           <label for="highpass">Audio Source:<br>
           <select id="audioSource" style="margin-bottom: 20px; width: 200px;">
             <option value="input" selected>Input</option>
             <option value="player">Player</option>
           </select>
-        </div>
+        </div> -->
       </div>
 
     </div>
@@ -64,9 +70,6 @@
 
   </div>
 
-  <div style="background-image: url('logo.jpg'); background-repeat: no-repeat; background-size: contain; background-position: center;">
-    <canvas id="canvas" width="1024" height="768"></canvas>
-  </div>
 </body>
 <script src="dist/bundle.js"></script>
 </html>

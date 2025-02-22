@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint:watch": "esw src --watch",
     "build": "webpack --mode=production --config webpack.config.js",
-    "serve": "webpack serve --mode=development --open --config webpack.config.js",
+    "serve": "webpack serve --mode=development --config webpack.config.js",
     "start": "run-p lint:watch serve"
   },
   "author": "Przemysław Barski",

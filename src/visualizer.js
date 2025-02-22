@@ -2,6 +2,7 @@ export default class Visualizer {
   audioContext = new AudioContext();
   smoothingIteration = 0;
   smoothingLevel = 1;
+  gain = 0.5;
 
 
   constructor(canvas, rmsSlider) {
@@ -45,6 +46,8 @@ export default class Visualizer {
 
   setGain(gain) {
     this.gain = gain;
+    this.gainNode.gain.setValueAtTime(this.gain, this.audioContext.currentTime);
+    console.log(parseFloat(this.gain));
   }
 
   setLowPassCutoff(lowPassCutoff) {
@@ -148,6 +151,12 @@ export default class Visualizer {
     this.dataToDraw = new Float32Array(this.analyser.frequencyBinCount);
 
 
+    // GAIN
+    // 
+
+    this.gainNode = this.audioContext.createGain();
+    this.gainNode.gain.setValueAtTime(this.gain, this.audioContext.currentTime);
+
     // LOW PASS FILTER
     // ---------
 
@@ -173,16 +182,19 @@ export default class Visualizer {
 
   routeAudio() {
     // this.audioPlayer.connect(this.audioContext.destination);
-    // this.audioPlayer.connect(this.lowPassFilter);
+    // this.audioPlayer.connect(this.gainNode);
     // this.audioPlayer.connect(this.rmsAnalyser);
+    // this.gainNode.connect(this.lowPassFilter);
     // this.lowPassFilter.connect(this.highPassFilter);
     // this.highPassFilter.connect(this.analyser);
+
     if (navigator.mediaDevices) {
       navigator.mediaDevices.getUserMedia({"audio": true}).then((stream) => {
 
         this.microphone = this.audioContext.createMediaStreamSource(stream);
-        this.microphone.connect(this.lowPassFilter);
         this.microphone.connect(this.rmsAnalyser);
+        this.microphone.connect(this.gainNode);
+        this.gainNode.connect(this.lowPassFilter);
         this.lowPassFilter.connect(this.highPassFilter);
         this.highPassFilter.connect(this.analyser);
       }).catch((err) => {
@@ -220,7 +232,7 @@ export default class Visualizer {
 
     for (let i = 1; i < length; i += 1) {
       x = i * segmentWidth;
-      let v = this.dataToDraw[i] * this.gain + 0.5;
+      let v = this.dataToDraw[i] + 0.5;
       let y = v * this.canvas.height;
       this.c.lineTo(x, y);
     }

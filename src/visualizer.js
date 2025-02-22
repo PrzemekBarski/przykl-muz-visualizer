@@ -2,6 +2,8 @@ export default class Visualizer {
   audioContext = new AudioContext();
   smoothingIteration = 0;
   smoothingLevel = 1;
+  timeBase = 0.01;
+  gain = 1;
 
 
   constructor(canvas, rmsSlider) {
@@ -12,6 +14,8 @@ export default class Visualizer {
     this.canvas.height = window.innerHeight;
     this.vp = this.canvas.height / 768;
     this.rmsSlider = rmsSlider;
+    this.waveformLength = this.audioContext.sampleRate * this.timeBase;
+    this.audioBuffer = Array(this.waveformLength);
 
     let pixelRatio = this.canvas.width / this.canvas.height;
 
@@ -36,6 +40,8 @@ export default class Visualizer {
 
   setTimeBase(timeBaseMs) {
     this.timeBase = timeBaseMs / 1000;
+    this.waveformLength = this.audioContext.sampleRate * this.timeBase;
+    this.audioBuffer.length = Math.ceil(this.waveformLength);
   }
 
   setSmoothingLevel(smoothingLevel) {
@@ -140,8 +146,10 @@ export default class Visualizer {
     // ---------
 
     this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 1024;
+    this.analyser.fftSize = 256;
     this.analyser.smoothingTimeConstant = 1;
+
+    this.acquireSamples();
 
     this.dataArray = new Float32Array(this.analyser.frequencyBinCount);
     this.previousData = new Float32Array(this.analyser.frequencyBinCount);
@@ -192,25 +200,29 @@ export default class Visualizer {
   }
 
   draw() {
+    const smoothing = false;
     let segmentWidth;
 
-    if (this.smoothingLevel > 1) {
-      if (this.smoothingIteration == this.smoothingLevel - 1) {
-        this.previousData = [...this.dataArray];
-        this.analyser.getFloatTimeDomainData(this.dataArray);
-        this.smoothingIteration = 0;
-      }
+    if (smoothing) {
+      if (this.smoothingLevel > 1) {
+        if (this.smoothingIteration == this.smoothingLevel - 1) {
+          this.previousData = [...this.dataArray];
+          this.analyser.getFloatTimeDomainData(this.dataArray);
+          this.smoothingIteration = 0;
+        }
 
-      this.dataToDraw = this.dataArray.map((el, index) => {
-        // return (this.previousData[index] * (this.smoothingLevel - this.smoothingIteration) + el * this.smoothingIteration) / this.smoothingLevel;
-        return (this.previousData[index] * Math.pow(this.smoothingLevel - this.smoothingIteration, 2) + el * Math.pow(this.smoothingIteration, 2)) / (Math.pow(this.smoothingLevel - this.smoothingIteration, 2) + Math.pow(this.smoothingIteration, 2));
-      });
+        this.dataToDraw = this.dataArray.map((el, index) => {
+          // return (this.previousData[index] * (this.smoothingLevel - this.smoothingIteration) + el * this.smoothingIteration) / this.smoothingLevel;
+          return (this.previousData[index] * Math.pow(this.smoothingLevel - this.smoothingIteration, 2) + el * Math.pow(this.smoothingIteration, 2)) / (Math.pow(this.smoothingLevel - this.smoothingIteration, 2) + Math.pow(this.smoothingIteration, 2));
+        });
+      } else {
+        this.analyser.getFloatTimeDomainData(this.dataToDraw);
+      }
     } else {
       this.analyser.getFloatTimeDomainData(this.dataToDraw);
     }
 
-    let length = this.audioContext.sampleRate * this.timeBase;
-    segmentWidth = this.canvas.width / length;
+    segmentWidth = this.canvas.width / this.waveformLength;
     this.c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.c.beginPath();
 
@@ -218,9 +230,9 @@ export default class Visualizer {
 
     let x = 0;
 
-    for (let i = 1; i < length; i += 1) {
+    for (let i = 1; i < this.audioBuffer.length; i += 1) {
       x = i * segmentWidth;
-      let v = this.dataToDraw[i] * this.gain + 0.5;
+      let v = this.audioBuffer[i] * this.gain + 0.5;
       let y = v * this.canvas.height;
       this.c.lineTo(x, y);
     }
@@ -230,5 +242,23 @@ export default class Visualizer {
 
     this.smoothingIteration += 1;
     requestAnimationFrame(this.draw.bind(this));
+  }
+
+  acquireSamples() {
+    let data = new Float32Array(this.analyser.frequencyBinCount);
+    this.analyser.getFloatTimeDomainData(data);
+
+    if (data[data.length - 1] != this.audioBuffer[this.audioBuffer.length - 1] &&
+        data[data.length - 2] != this.audioBuffer[this.audioBuffer.length - 2] &&
+        data[data.length - 3] != this.audioBuffer[this.audioBuffer.length - 3]) {
+      this.audioBuffer = this.audioBuffer.slice(this.analyser.frequencyBinCount);
+      this.audioBuffer = this.audioBuffer.concat([...data]);
+      // console.log("--------");
+    } else {
+      // console.log("duplicate");
+    }
+
+    setTimeout(this.acquireSamples.bind(this), 0.5);
+    // setTimeout(this.acquireSamples.bind(this), this.analyser.frequencyBinCount * 1000 / this.audioContext.sampleRate);
   }
 }

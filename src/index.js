@@ -2,6 +2,11 @@ import Visualizer from "./visualizer.js";
 
 const visualizer = new Visualizer(document.getElementById("canvas"), document.getElementById("rms"));
 
+let data = [1,2,3,4,5,6];
+data = data.slice(2);
+data.length += 2;
+console.log(data[4]);
+
 
 const timeBaseSlider = document.getElementById("timebase");
 const gainSlider = document.getElementById("gain");
